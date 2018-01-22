@@ -1,0 +1,156 @@
+---
+title: "Coursera Practical Machine Learning Final Project"
+author: "Mohamed Chenini"
+date: "1/21/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+This document is the final project for the Coursera **"*Practical Machine Learning*"** course. It was produced using RStudio's Markdown and Knitr.
+
+## Overview
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The data consists of a Training data and a Test data.
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with.
+
+**Note:** The dataset used in this project is a courtesy of "Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements"
+
+## Data Loading and Processing
+```{r,echo=TRUE}
+library(e1071)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+library(knitr)
+```
+
+The training data will be split into training and test data and the testing data will be used as the validation data
+```{r, echo=TRUE}
+train_in <- read.csv('./pml-training.csv', header=T)
+test_in <- read.csv('./pml-testing.csv', header=T)
+
+```
+
+## Data Exploratory
+As shown below there are 19622 observations and 160 variables 
+
+```{r, echo=TRUE}
+dim(train_in)
+dim(test_in)
+```
+## Data Cleaning
+We remove the variables that contains missing values, and the first seven variables as they have little impact on the outcome ***classe***
+
+```{r, echo=TRUE}
+train_in <- train_in[, colSums(is.na(train_in)) == 0]
+test_in <- test_in[, colSums(is.na(test_in)) == 0]
+
+trainData <- train_in[, -c(1:7)]
+testData <- test_in[, -c(1:7)]
+```
+Number of observations and variables after  cleaning the original data
+
+```{r, echo=TRUE}
+dim(trainData)
+dim(testData)
+```
+
+## Preparing the datasets for prediction
+Preparing the data for prediction and validation by splitting the data into 70% as training data and 30% as validation data. This splitting will server also to compute the out-of-sample errors.
+
+The test data will stay as is.
+
+```{r, echo=TRUE}
+set.seed(1234) 
+inTrain <- createDataPartition(trainData$classe, p = 0.7, list = FALSE)
+train <- trainData[inTrain, ]
+valid <- trainData[-inTrain, ]
+```
+
+## Model building
+For this project we will use two different algorithms, classification tree and random forests, to predict the outcome.
+
+1. classification trees
+2. random forests
+
+### Classification trees
+For this model we wil use a  5-fold cross validation as the resampling method, and the method name is **"cv"**.
+
+```{r, echo=TRUE}
+ctrl <- trainControl(method = "cv", number = 5)
+fit_rpart <- train(classe ~ ., data = train, method = "rpart", trControl = ctrl)
+print(fit_rpart, digits = 4)
+```
+
+
+```{r, echo=TRUE}
+# Display the fancy report using the fancyRpartPlot function
+fancyRpartPlot(fit_rpart$finalModel)
+```
+
+
+
+Now we predict the ***classe*** outcome using the validation set
+
+```{r, echo=TRUE}
+# We use the validation set to predict the classe outcome
+predict_rpart <- predict(fit_rpart, valid)
+# Display the prediction result
+(conf_rpart <- confusionMatrix(valid$classe, predict_rpart))
+```
+
+Display the accuracy rate 
+```{r, echo=TRUE}
+(accuracy_rpart <- conf_rpart$overall[1])
+```
+
+
+### Analysis of the Accuracy
+From the output of the *Confusion Matrix and Statistics* shown abovethe accuarcy rate is ***0.5***, so with an out-of-sample error rate of ***0.5***, the outcome ***classe*** is not well predicted with the *Classification tree*
+
+### Random Forests
+
+From the "Practical Machine Learning Course Notes":
+"random forest algorithm automatically bootstrap by default, but it is still important to have
+train/test/validation split to verify the accuracy of the model"
+```{r, echo=TRUE}
+
+fit_rf <- train(classe ~ ., data = train, method = "rf", trControl = ctrl)
+print(fit_rf, digits = 4)
+```
+
+```{r, echo=TRUE}
+# We use the validation set to predict the classe outcome
+predict_rf <- predict(fit_rf, valid)
+# Display the prediction result
+(conf_rf <- confusionMatrix(valid$classe, predict_rf))
+```
+
+### Analysis of the Accuracy
+
+```{r, echo=TRUE}
+(accuracy_rf <- conf_rf$overall[1])
+```
+
+
+With a an accuracy rate of ***0.991***, the *random forest* model is better than the *classification* model, so the out-of-sample error rate is **100 - 0.991 = 0.009**.
+
+
+### Applying the prediction to the Testing Set
+
+```{r, echo=TRUE}
+(predict(fit_rf, testData))
+```
+
+We use the above result to answer the **Course Project Prediction Quiz**
